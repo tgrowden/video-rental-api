@@ -1,0 +1,53 @@
+Part 1 – Programming Exercise
+You are to use TypeScript to build a middleware/service for a video rental store to enable
+users to search for videos available to rent. You may use a serverless function or design a
+Docker based service using Node/Express – whichever you prefer but please be ready to
+explain the though process behind your decision along with pros/cons of either approach.
+
+UI development is nearing completion using React and mock data. Now we want to
+complete the integration with the back end, and the plan is to use your new service to
+perform searches by POSTing the following payload:
+
+export type FilmSearchRequest = {
+    currentPage: number;
+    pageSize: number;
+    sortField: 'title' | 'releaseYear';
+    sortDirection: 'ASC' | 'DESC'
+    excludeVHS: boolean;
+    excludeDVD: boolean;
+    excludeProjector: boolean;
+    search: {
+        title: string;
+        releaseYear: number;
+        director: string;
+        distributor: string;
+    }
+}
+
+The video data itself, is distributed across three separate data-stores with each having their
+own respective microservice:
+vhs.servicecom, dvd.service.com, and prjktr.service.com
+Each of these three microservices already has a search function accessible via a POST to
+their respective /search route. These methods accept the same BODY payload as the
+search above from the UI, and returns the following:
+export type Film = {
+    title: string;
+    releaseYear: number;
+    numberOfCopiesAvailable: number;
+    director: string;
+    distributor: string;
+}
+
+Requirements
+The new service must accept a request from the UI, perform a search across the applicable
+downstream services, aggregate, and de-dupe the results. It must also account for
+pagination as we don’t want to send all the results from all of the services back to the UI.
+The service will be deployed in a cloud environment, will have a load balancer in front of it,
+and will be configured to auto scale, but session stickiness is not available.
+Important considerations to point out that the same movie/content may be available from
+multiple sources. For example, "Psycho (1960)" is available in VHS, DVD, and Projector,
+whereas Avengers: Endgame (2019) is only available on DVD. These duplicates should be
+returned as one record in the result set to the UI, and the entire result set should always
+maintain the pagination and sort order provided by the end-user.
+Contracts for both the UI as well as the back-end services may be changed, but doing so
+would lengthen overall development and is therefore a less preferable option.

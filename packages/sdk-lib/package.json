@@ -1,0 +1,13 @@
+{
+  "name": "sdk-lib",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "tsc"
+  }
+}

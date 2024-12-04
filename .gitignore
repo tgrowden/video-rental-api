@@ -1,0 +1,9 @@
+node_modules
+dist
+requirements.pdf
+
+.vscode
+
+.nx
+.nx/cache
+.nx/workspace-data

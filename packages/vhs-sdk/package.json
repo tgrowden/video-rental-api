@@ -1,0 +1,15 @@
+{
+  "name": "vhs-sdk",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "license": "MIT",
+  "dependencies": {
+    "sdk-lib": "workspace:sdk-lib"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  },
+  "scripts": {
+    "build": "tsc"
+  }
+}
