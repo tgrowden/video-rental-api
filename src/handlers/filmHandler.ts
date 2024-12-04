@@ -17,9 +17,9 @@ export type FilmSearchResponse = (Pick<Film, "title" | "director" | "releaseYear
 })[];
 
 export async function filmSearchHandler(params: FilmSearchRequestParams): Promise<FilmSearchResponse> {
-  const vhsFilms = await searchVhs(params);
-  const dvdFilms = await searchDvd(params);
-  const prjktrFilms = await searchPrjktr(params);
+  const vhsFilms = params.excludeVHS ? [] : await searchVhs(params);
+  const dvdFilms = params.excludeDVD ? [] : await searchDvd(params);
+  const prjktrFilms = params.excludeProjector ? [] : await searchPrjktr(params);
 
   const allFilms = [...vhsFilms, ...dvdFilms, ...prjktrFilms];
 
