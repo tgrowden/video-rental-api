@@ -1,0 +1,104 @@
+{
+  "openapi": "3.0.0",
+  "servers": [
+    {
+      "description": "Local development",
+      "url": "http://localhost:3000"
+    }
+  ],
+  "info": {
+    "description": "A video rental API",
+    "version": "1.0.0",
+    "title": "Video Rental API",
+    "contact": {
+      "email": "taylor.growden@gmail.com"
+    }
+  },
+  "paths": {
+    "/films": {
+      "post": {
+        "summary": "Search films",
+        "operationId": "searchFilms",
+        "description": "Searches films based on given params",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "invalid input, object invalid"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FilmSearchRequestParams"
+              }
+            }
+          },
+          "description": "Params to limit films in search"
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FilmSearchRequestParams": {
+        "type": "object",
+        "properties": {
+          "currentPage": {
+            "type": "number",
+            "format": "int",
+            "default": 0
+          },
+          "pageSize": {
+            "type": "number",
+            "format": "int",
+            "default": 20
+          },
+          "sortField": {
+            "type": "string",
+            "enum": ["title", "releaseYear"],
+            "default": "title"
+          },
+          "sortDirection": {
+            "type": "string",
+            "enum": ["ASC", "DESC"],
+            "default": "ASC"
+          },
+          "excludeVHS": {
+            "type": "boolean",
+            "default": false
+          },
+          "excludeDVD": {
+            "type": "boolean",
+            "default": false
+          },
+          "excludeProjector": {
+            "type": "boolean",
+            "default": false
+          },
+          "search": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "releaseYear": {
+                "type": "number",
+                "format": "int",
+                "example": 1980
+              },
+              "director": {
+                "type": "string"
+              },
+              "distributor": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
