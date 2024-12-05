@@ -69,7 +69,7 @@ export async function filmSearchHandler(params: FilmSearchRequestParams): Promis
       default:
         return params.sortDirection === "ASC" ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title);
     }
-  }).slice(params.currentPage * params.pageSize, params.pageSize * (params.currentPage + 1));
+  }).slice(params.currentPage * params.pageSize, params.pageSize * params.currentPage + params.pageSize);
 
   return result;
 }
