@@ -11,7 +11,6 @@ filmRouter.post("/", async (req: Request, res: Response) => {
   if (!params.success) {
     res.status(400).json(params.error);
   } else {
-    console.log(params.data);
     const response = await filmSearchHandler(params.data);
     res.json(response);
   }
