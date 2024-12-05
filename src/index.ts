@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { Application } from "express";
 import bodyParser from "body-parser";
 import filmRouter from "./routers/filmRouter";

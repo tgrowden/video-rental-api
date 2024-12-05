@@ -7,3 +7,5 @@ requirements.pdf
 .nx
 .nx/cache
 .nx/workspace-data
+
+.env

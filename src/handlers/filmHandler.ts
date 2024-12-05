@@ -1,10 +1,19 @@
+import Redis from "ioredis";
 import { searchPrjktr } from "prjktr-sdk";
 import { searchDvd } from "dvd-sdk";
 import { searchVhs } from "vhs-sdk";
 import { Film } from "sdk-lib";
+import shortHash from "short-hash";
+
 import { FilmSearchRequestParams } from "../validators/filmValidators";
-import { PriorityQueue } from "../utils/PriorityQueue";
 import { getFilmKey } from "../utils/filmUtils";
+
+interface Service {
+  fetch: null | ((params: FilmSearchRequestParams) => Promise<Film[]>);
+  pointer: number;
+  ended: boolean;
+  lastFetchedCount: number;
+}
 
 interface FilmVersion {
   format: Film["format"];
@@ -15,16 +24,159 @@ export type FilmSearchResponse = (Pick<Film, "title" | "director" | "releaseYear
   versions: FilmVersion[];
 })[];
 
-interface Service {
-  fetch: null | ((params: FilmSearchRequestParams) => Promise<Film[]>);
-  pointer: number;
-  ended: boolean;
-  lastFetchedCount: number;
-}
-
 const CHUNK_SIZE = 10;
 
+/**
+ * @todo: abstract this into a separate module so that
+ * it can A) be mocked and B) cache can be invalidated
+ * upon new/changed data
+ */
+const redis = new Redis({
+  host: process.env.REDIS_HOST,
+  port: process.env.REDIS_PORT ? Number.parseInt(process.env.REDIS_PORT, 10) : undefined,
+  password: process.env.REDIS_PASSWORD
+});
+
+const DELIMITER = "\uFFFF";
+
+async function insertFilmResult(searchId: string, film: Film, sortField: "title" | "releaseYear"): Promise<void> {
+  const filmKey = getFilmKey(film);
+
+  const pipeline = redis.multi();
+
+  pipeline.hsetnx(`film:${filmKey}`, "title", film.title);
+  pipeline.hsetnx(`film:${filmKey}`, "director", film.director);
+  pipeline.hsetnx(`film:${filmKey}`, "distributor", film.distributor);
+  pipeline.hsetnx(`film:${filmKey}`, "releaseYear", film.releaseYear.toString());
+
+  pipeline.hincrby(`film:${filmKey}`, `format:${film.format}`, film.numberOfCopiesAvailable);
+
+  if (sortField === "releaseYear") {
+    const score = film.releaseYear;
+    pipeline.zadd(`search:${searchId}`, "NX", score, filmKey);
+  } else {
+    const member = `${film.title}${DELIMITER}${filmKey}`;
+    pipeline.zadd(`search:${searchId}`, "NX", 0, member);
+  }
+
+  await pipeline.exec();
+}
+
+async function getFilmCount(searchId: string): Promise<number> {
+  return redis.zcard(`search:${searchId}`);
+}
+
+async function fetchPage(
+  searchId: string,
+  sortField: "title" | "releaseYear",
+  sortDirection: "ASC" | "DESC",
+  currentPage: number,
+  pageSize: number
+): Promise<FilmSearchResponse> {
+  const startIndex = currentPage * pageSize;
+  const sortAscending = sortDirection === "ASC";
+
+  let members: string[] = [];
+
+  if (sortField === "releaseYear") {
+    if (sortAscending) {
+      members = await redis.zrange(
+        `search:${searchId}`,
+        0,
+        0,
+        // @ts-expect-error this is fine
+        "BYSCORE",
+        "-",
+        "+",
+        "LIMIT",
+        startIndex.toString(),
+        pageSize.toString()
+      );
+    } else {
+      // @ts-expect-error this is fine
+      members = await redis.zrange(
+        `search:${searchId}`,
+        0,
+        0,
+        "BYSCORE",
+        "+",
+        "-",
+        "REV",
+        "LIMIT",
+        startIndex.toString(),
+        pageSize.toString()
+      );
+    }
+  } else {
+    // Sort by title using lex range
+    if (sortAscending) {
+      members = await redis.zrange(
+        `search:${searchId}`,
+        "-",
+        "+",
+        "BYLEX",
+        "LIMIT",
+        startIndex.toString(),
+        pageSize.toString()
+      );
+    } else {
+      // DESC
+      members = await redis.zrange(
+        `search:${searchId}`,
+        "+",
+        "-",
+        "BYLEX",
+        "REV",
+        "LIMIT",
+        startIndex.toString(),
+        pageSize.toString()
+      );
+    }
+  }
+
+  const results: FilmSearchResponse = [];
+
+  for (const member of members) {
+    let filmKey = member;
+    if (sortField === "title") {
+      const index = member.indexOf(DELIMITER);
+      if (index !== -1) {
+        filmKey = member.substring(index + DELIMITER.length);
+      }
+    }
+
+    const filmData = await redis.hgetall(`film:${filmKey}`);
+    const { title, director, distributor, releaseYear, ...rest } = filmData;
+    const versions: FilmVersion[] = [];
+
+    for (const [k, v] of Object.entries(rest)) {
+      if (k.startsWith("format:")) {
+        const fmt = k.split(":")[1] as Film["format"];
+        versions.push({
+          format: fmt,
+          numberOfCopiesAvailable: Number.parseInt(v, 10)
+        });
+      }
+    }
+
+    results.push({
+      title,
+      director,
+      releaseYear: Number.parseInt(releaseYear, 10),
+      distributor,
+      versions
+    });
+  }
+
+  return results;
+}
+
+function getSearchId(params: FilmSearchRequestParams): string {
+  return shortHash(JSON.stringify(params));
+}
+
 export async function filmSearchHandler(params: FilmSearchRequestParams): Promise<FilmSearchResponse> {
+  const searchId = getSearchId(params);
   const startIndex = params.pageSize * params.currentPage;
   const endIndex = startIndex + params.pageSize;
 
@@ -34,132 +186,49 @@ export async function filmSearchHandler(params: FilmSearchRequestParams): Promis
     { fetch: params.excludeProjector ? null : searchPrjktr, pointer: 0, ended: false, lastFetchedCount: 0 }
   ];
 
-  const priorityQueue = new PriorityQueue<Film>((a, b) => {
-    switch (params.sortField) {
-      case "releaseYear":
-        return params.sortDirection === "ASC" ? a.releaseYear - b.releaseYear : b.releaseYear - a.releaseYear;
-      case "title":
-      default:
-        return params.sortDirection === "ASC" ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title);
-    }
-  });
-
-  const filmMap = new Map<string, FilmSearchResponse[number]>();
-
-  let globalCount = 0;
-
-  const results: FilmSearchResponse = [];
-
-  async function fetchChunksIfNeeded(): Promise<void> {
-    if (!priorityQueue.isEmpty()) return;
-
-    for (const service of services) {
-      if (service.fetch && !service.ended && service.lastFetchedCount !== 0) {
-        const newResults = await service.fetch({ ...params, pageSize: CHUNK_SIZE, currentPage: service.pointer });
-        service.pointer++;
-        service.lastFetchedCount = newResults.length;
-
-        if (newResults.length === 0) {
-          service.ended = true;
-        } else {
-          for (const film of newResults) {
-            priorityQueue.enqueue(film);
-          }
+  async function fetchAndInsertChunks(service: Service) {
+    if (service.fetch && !service.ended) {
+      const newResults = await service.fetch({ ...params, pageSize: CHUNK_SIZE, currentPage: service.pointer });
+      service.pointer++;
+      service.lastFetchedCount = newResults.length;
+      if (newResults.length === 0) {
+        service.ended = true;
+      } else {
+        for (const film of newResults) {
+          await insertFilmResult(searchId, film, params.sortField);
         }
       }
     }
   }
 
   for (const service of services) {
-    if (service.fetch && !service.ended) {
-      const initialData = await service.fetch({ ...params, pageSize: CHUNK_SIZE, currentPage: service.pointer });
-      service.pointer++;
-      service.lastFetchedCount = initialData.length;
-      if (initialData.length === 0) {
-        service.ended = true;
-      } else {
-        for (const film of initialData) {
-          priorityQueue.enqueue(film);
-        }
-      }
-    }
+    await fetchAndInsertChunks(service);
   }
 
-  while (results.length < params.pageSize) {
-    if (priorityQueue.isEmpty()) {
-      await fetchChunksIfNeeded();
-      if (priorityQueue.isEmpty()) {
-        break;
+  let totalFilms = await getFilmCount(searchId);
+
+  while (totalFilms < endIndex) {
+    let fetchedMore = false;
+    for (const service of services) {
+      if (service.fetch && !service.ended && service.lastFetchedCount !== 0) {
+        await fetchAndInsertChunks(service);
+        fetchedMore = true;
       }
     }
 
-    // we know this is non-null
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const nextFilm = priorityQueue.dequeue()!;
-    const filmKey = getFilmKey(nextFilm);
-
-    const existingFilm = filmMap.get(filmKey);
-    if (!existingFilm) {
-      globalCount++;
-      if (globalCount <= startIndex) {
-        filmMap.set(filmKey, {
-          title: nextFilm.title,
-          director: nextFilm.director,
-          releaseYear: nextFilm.releaseYear,
-          distributor: nextFilm.distributor,
-          versions: [
-            {
-              format: nextFilm.format,
-              numberOfCopiesAvailable: nextFilm.numberOfCopiesAvailable
-            }
-          ]
-        });
-      } else if (globalCount > endIndex) {
-        filmMap.set(filmKey, {
-          title: nextFilm.title,
-          director: nextFilm.director,
-          releaseYear: nextFilm.releaseYear,
-          distributor: nextFilm.distributor,
-          versions: [
-            {
-              format: nextFilm.format,
-              numberOfCopiesAvailable: nextFilm.numberOfCopiesAvailable
-            }
-          ]
-        });
-        break;
-      } else {
-        const newEntry = {
-          title: nextFilm.title,
-          director: nextFilm.director,
-          releaseYear: nextFilm.releaseYear,
-          distributor: nextFilm.distributor,
-          versions: [
-            {
-              format: nextFilm.format,
-              numberOfCopiesAvailable: nextFilm.numberOfCopiesAvailable
-            }
-          ]
-        };
-        filmMap.set(filmKey, newEntry);
-        results.push(newEntry);
-
-        if (results.length === params.pageSize) {
-          break;
-        }
-      }
-    } else {
-      const existingVersion = existingFilm.versions.find((v) => v.format === nextFilm.format);
-      if (existingVersion) {
-        existingVersion.numberOfCopiesAvailable += nextFilm.numberOfCopiesAvailable;
-      } else {
-        existingFilm.versions.push({
-          format: nextFilm.format,
-          numberOfCopiesAvailable: nextFilm.numberOfCopiesAvailable
-        });
-      }
+    if (!fetchedMore) {
+      break;
     }
+
+    totalFilms = await getFilmCount(searchId);
   }
 
+  const results = await fetchPage(
+    searchId,
+    params.sortField,
+    params.sortDirection,
+    params.currentPage,
+    params.pageSize
+  );
   return results;
 }

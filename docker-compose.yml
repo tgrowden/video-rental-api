@@ -1,7 +1,16 @@
 version: '3'
 
 services:
+  redis:
+    image: redis:latest
+    expose:
+      - '3000'
+    ports:
+      - "6379:6379"
+
   express-typescript-docker:
+    depends_on:
+      - redis
     environment:
       - NODE_ENV=development
     build:
