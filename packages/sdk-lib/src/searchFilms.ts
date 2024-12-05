@@ -30,6 +30,20 @@ export function searchFilms(films: Film[], opts: SearchFilmsOptions): Promise<Fi
     });
   }
 
+  result = result.sort((a, b) => {
+    switch (opts.sortField) {
+      case "releaseYear":
+        return opts.sortDirection === "ASC" ? a.releaseYear - b.releaseYear : b.releaseYear - a.releaseYear;
+      case "title":
+      default:
+        return opts.sortDirection === "ASC" ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title);
+    }
+  });
+
+  const startIndex = opts.pageSize * opts.currentPage;
+  const endIndex = startIndex + opts.pageSize;
+
+  result = result.slice(startIndex, endIndex);
   return new Promise((resolve) => {
     resolve(result);
   });
