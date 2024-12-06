@@ -19,7 +19,8 @@ export default tseslint.config(
     },
     rules: {
       "@typescript-eslint/no-misused-promises": "off",
-      "@typescript-eslint/require-await": "off"
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/unbound-method": "off"
     }
   },
   eslintPluginPrettierRecommended
