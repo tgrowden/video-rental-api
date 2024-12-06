@@ -40,6 +40,8 @@
     "express": "^4.21.1",
     "ioredis": "^5.4.1",
     "lerna": "^8.1.9",
+    "pino": "^9.5.0",
+    "pino-pretty": "^13.0.0",
     "prjktr-sdk": "workspace:prjktr-sdk",
     "reflect-metadata": "^0.2.2",
     "sdk-lib": "workspace:sdk-lib",
