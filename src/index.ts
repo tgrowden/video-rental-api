@@ -33,11 +33,7 @@ function start() {
       logger.info(`Connected successfully on port ${PORT.toString()}`);
     });
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error(`Error:`, error.message);
-    } else {
-      console.error(`Error:`, error);
-    }
+    logger.error(error, `Error`);
   }
 }
 
