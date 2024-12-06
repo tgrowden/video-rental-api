@@ -5,6 +5,7 @@ import { searchPrjktr } from "prjktr-sdk";
 import { searchDvd } from "dvd-sdk";
 import { searchVhs } from "vhs-sdk";
 
+import LoggerService from "./LoggerService";
 import { getFilmKey } from "../utils/filmUtils";
 import { FilmSearchRequestParams } from "../validators/filmValidators";
 import RedisService from "./RedisService";
@@ -29,12 +30,15 @@ interface FilmMediumService {
 export default class FilmSearchService {
   private redisService: RedisService;
 
+  private logger: LoggerService;
+
   private DELIMITER = "\uFFFF";
 
   private CHUNK_SIZE = 10;
 
   constructor() {
     this.redisService = Container.get(RedisService);
+    this.logger = Container.get(LoggerService);
   }
 
   public getSearchId(params: FilmSearchRequestParams): string {
@@ -215,6 +219,16 @@ export default class FilmSearchService {
     const searchId = this.getSearchId(params);
     const startIndex = params.pageSize * params.currentPage;
     const endIndex = startIndex + params.pageSize;
+
+    const hasResults = await this.getFilmCount(searchId);
+
+    if (hasResults) {
+      this.logger.info("Using cached results");
+      const results = await this.fetchPage({ ...params, searchId });
+
+      return results;
+    }
+    this.logger.info("Fetching new results");
 
     const services: FilmMediumService[] = [
       { fetch: params.excludeVHS ? null : searchVhs, pointer: 0, ended: false, lastFetchedCount: 0 },
