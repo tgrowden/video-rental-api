@@ -41,8 +41,10 @@
     "ioredis": "^5.4.1",
     "lerna": "^8.1.9",
     "prjktr-sdk": "workspace:prjktr-sdk",
+    "reflect-metadata": "^0.2.2",
     "sdk-lib": "workspace:sdk-lib",
     "short-hash": "^1.0.0",
+    "typedi": "^0.10.0",
     "vhs-sdk": "workspace:vhs-sdk",
     "zod": "^3.23.8"
   }

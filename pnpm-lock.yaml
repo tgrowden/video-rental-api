@@ -29,12 +29,18 @@ importers:
       prjktr-sdk:
         specifier: workspace:prjktr-sdk
         version: link:packages/prjktr-sdk
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
       sdk-lib:
         specifier: workspace:sdk-lib
         version: link:packages/sdk-lib
       short-hash:
         specifier: ^1.0.0
         version: 1.0.0
+      typedi:
+        specifier: ^0.10.0
+        version: 0.10.0
       vhs-sdk:
         specifier: workspace:vhs-sdk
         version: link:packages/vhs-sdk
@@ -5123,6 +5129,10 @@ packages:
       redis-errors: 1.2.0
     dev: false
 
+  /reflect-metadata@0.2.2:
+    resolution: {integrity: sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==}
+    dev: false
+
   /require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
     engines: {node: '>=0.10.0'}
@@ -5878,6 +5888,10 @@ packages:
 
   /typedarray@0.0.6:
     resolution: {integrity: sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==}
+    dev: false
+
+  /typedi@0.10.0:
+    resolution: {integrity: sha512-v3UJF8xm68BBj6AF4oQML3ikrfK2c9EmZUyLOfShpJuItAqVBHWP/KtpGinkSsIiP6EZyyb6Z3NXyW9dgS9X1w==}
     dev: false
 
   /typescript-eslint@8.17.0(eslint@9.16.0)(typescript@5.7.2):
